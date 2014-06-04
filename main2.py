@@ -13,36 +13,36 @@ def worker(tile_name, tile_size, image_path):
             theta = math_cache['zp'][tile_y, tile_x]
             phi = math_cache['phi'][tile_x, tile_y]
             phi = update_phi(half_size, phi, tile_y, tile_x, math.pi, 0, -math.pi/2, math.pi/2)
-            return (theta, phi, )
+            return (theta, phi)
 
         def down(tile_y, tile_x):
             theta = math_cache['zm'][tile_y, tile_x]
-            phi = math_cache['phi'][tile_x, tile_size - tile_y]
+            phi = math_cache['phi'][tile_x, tile_size - tile_y - 1]
             phi = update_phi(half_size, phi, tile_y, tile_x, 0, math.pi, -math.pi/2, math.pi/2)
-            return (theta, phi, )
+            return (theta, phi)
 
         def front(tile_y, tile_x):
-            theta = math_cache['xypm'][tile_size - tile_y, tile_size - tile_x]
-            phi = math_cache['phi'][tile_x, tile_size]
+            theta = math_cache['xypm'][tile_size - tile_y - 1, tile_size - tile_x - 1]
+            phi = math_cache['phi'][tile_x, tile_size - 1]
             phi = update_phi(half_size, phi, tile_y, tile_x, 0, 0, -math.pi/2, math.pi/2)
-            return (theta, phi, )
+            return (theta, phi)
 
         def right(tile_y, tile_x):
-            theta = math_cache['xypm'][tile_size - tile_y, tile_size - tile_x]
-            phi = math_cache['phi'][tile_size, tile_size - tile_x]
+            theta = math_cache['xypm'][tile_size - tile_y - 1, tile_size - tile_x - 1]
+            phi = math_cache['phi'][tile_size - 1, tile_size - tile_x - 1]
             phi = update_phi(half_size, phi, tile_x, tile_y, 0, math.pi, math.pi/2, math.pi/2)
-            return (theta, phi, )
+            return (theta, phi)
 
         def back(tile_y, tile_x):
-            theta = math_cache['xypm'][tile_size - tile_y, tile_size - tile_x]
-            phi = math_cache['phi'][tile_x, tile_size] + math.pi
-            return (theta, phi, )
+            theta = math_cache['xypm'][tile_size - tile_y - 1, tile_size - tile_x - 1]
+            phi = math_cache['phi'][tile_x, tile_size - 1] + math.pi
+            return (theta, phi)
 
         def left(tile_y, tile_x):
-            theta = math_cache['xypm'][tile_size - tile_y, tile_size - tile_x]
-            phi = math_cache['phi'][tile_size, tile_size - tile_x]
+            theta = math_cache['xypm'][tile_size - tile_y - 1, tile_size - tile_x - 1]
+            phi = math_cache['phi'][tile_size - 1, tile_size - tile_x - 1]
             phi = update_phi(half_size, phi, tile_x, tile_y, math.pi, 0, -math.pi/2, -math.pi/2)
-            return (theta, phi, )
+            return (theta, phi)
 
         return locals()[tile_name]
 
@@ -51,7 +51,7 @@ def worker(tile_name, tile_size, image_path):
             phi = phi + major_m
         elif major_dir > half_size:
             phi = phi + major_p
-        elif major_dir < half_size:
+        elif minor_dir < half_size:
             phi = minor_m
         else:
             phi = minor_p
@@ -70,17 +70,17 @@ def worker(tile_name, tile_size, image_path):
 
     def process_cords(rect_x, rect_y, sphere_image, calc_method):
 
-        theta, phi = calc_method(rect_x, rect_y)
+        theta, phi = calc_method(rect_y, rect_x)
         sphere_height, sphere_width, __channels = sphere_image.shape
-        sp_x = max(round(phi2width(sphere_width, phi) -1), 1)
-        sp_y = max(round(theta2height(sphere_height, theta) -1), 1)
+        sp_x = int(phi2width(sphere_width, phi))
+        sp_y = int(theta2height(sphere_height, theta))
         # print '{}x{}\n'.format(sp_y, sp_x)
         return sphere_image[sp_y, sp_x]
 
 
     print 'Process for tile: {} --> started'.format(tile_name)
     tile = np.zeros((tile_size, tile_size, 3), dtype=np.uint8)
-    half_size = tile_size / 2
+    half_size = float(tile_size - 1) / 2
     method_for_calc = calc(tile_name)
     sphere_image = io.imread(image_path)
     for tile_y in xrange(tile_size):
@@ -93,15 +93,16 @@ if __name__ == '__main__':
     import time
     processes = []
     tiles_names = ['up', 'down', 'front', 'right', 'back', 'left']
-    tile_size = 64
-    start_time = time.time()
+    tile_size = 512
     math_cache = cache
     # worker(tiles_names)
+    print 'Start cut'
+    start_time = time.time()
     for tile_name in tiles_names:
-        worker(tile_name, tile_size, 'panorama.jpg')
-        # process = Process(target=worker, args=(tile_name, tile_size, 'panorama.jpg'))
-        # process.start()
-        # processes.append(process)
-    # [process.join() for process in processes]
+        # worker(tile_name, tile_size, 'panorama.jpg')
+        process = Process(target=worker, args=(tile_name, tile_size, 'panorama.jpg'))
+        process.start()
+        processes.append(process)
+    [process.join() for process in processes]
     execution_time = time.time() - start_time
     print 'Execution time is: {}s'.format(execution_time)
